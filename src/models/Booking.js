@@ -31,15 +31,28 @@ const bookingSchema = new mongoose.Schema({
     amount: {
         type: Number
     },
+    // Adding expireAt field which acts as a TTL (Time To Live) index
+    expireAt: {
+        type: Date,
+        default: undefined // By default no expiry, we set this when creating PENDING bookings
+    },
     createdAt: {
         type: Date,
         default: Date.now
     }
 });
 
-// Compound index to ensure a slot is unique per day
-// Actually, we want to allow different users to check status, but ONE booking per slot.
-// So (date, time) must be unique.
-bookingSchema.index({ date: 1, time: 1 }, { unique: true });
+// Partial Index: Enforce uniqueness ONLY for CONFIRMED or PENDING bookings.
+bookingSchema.index(
+    { date: 1, time: 1 }, 
+    { 
+        unique: true, 
+        partialFilterExpression: { status: { $in: ['CONFIRMED', 'PENDING'] } } 
+    }
+);
+
+// TTL Index: Automatically delete documents after expireAt time is reached
+// This is handled by MongoDB background worker (~60s precision)
+bookingSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model('Booking', bookingSchema);

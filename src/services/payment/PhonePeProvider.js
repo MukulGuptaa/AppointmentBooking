@@ -29,6 +29,7 @@ class PhonePeProvider extends PaymentGatewayInterface {
         // I will follow the code snippet as it is more likely to be copy-paste correct.
 
         try {
+            console.log(`[PhonePe] Initiating Payment for Order: ${orderId}, Amount: ${amount}`);
             // Docs snippet:
             // const orderRequest = CreateSdkOrderRequest.StandardCheckoutBuilder() ... .build();
 
@@ -38,9 +39,9 @@ class PhonePeProvider extends PaymentGatewayInterface {
             const requestBuilder = CreateSdkOrderRequest.StandardCheckoutBuilder()
                 .merchantOrderId(orderId)
                 .amount(amountInPaise)
-                .redirectUrl(`http://localhost:5002/api/payments/callback`) // "redirectUrl" in builder
+                .redirectUrl(`http://localhost:5002/api/payments/callback/${orderId}`) // "redirectUrl" in builder
                 .message("Booking Payment") // Optional message
-                .expireAfter(3600); // 1 hour expiry
+                .expireAfter(300); // 1 hour expiry
 
             // MetaInfo is optional but good practice if needed.
             // .metaInfo(MetaInfo.builder()...build())
@@ -52,14 +53,16 @@ class PhonePeProvider extends PaymentGatewayInterface {
 
             // Response has: redirectUrl, etc.
             if (response && response.redirectUrl) {
+                console.log(`[PhonePe] Payment Initiated Successfully. Redirect URL: ${response.redirectUrl}`);
                 return {
                     transactionId: orderId, // The order ID we sent
                     redirectUrl: response.redirectUrl,
-                    payload: response
+                    payload: response,
+                    expireAt: new Date(Date.now() + 300000),
                 };
             } else {
                 // Fallback if structure differs or check logs
-                console.log("PhonePe SDK Response:", JSON.stringify(response));
+                console.error("[PhonePe] Unexpected SDK Response:", JSON.stringify(response));
                 if (response.code) { // Check for error codes
                     throw new Error(response.message || 'Payment initiation failed');
                 }
@@ -67,13 +70,14 @@ class PhonePeProvider extends PaymentGatewayInterface {
             }
 
         } catch (error) {
-            console.error('PhonePe SDK Initiate Error:', error);
+            console.error('[PhonePe] Initiate Payment Error:', error.message);
             throw error;
         }
     }
 
     async verifyPayment(transactionId) {
         try {
+            console.log(`[PhonePe] Verifying Payment for Transaction ID: ${transactionId}`);
             // Docs: client.getOrderStatus(merchantOrderId)
             // returns { state: ... }
             const response = await this.client.getOrderStatus(transactionId);
@@ -83,6 +87,7 @@ class PhonePeProvider extends PaymentGatewayInterface {
 
             // Map state to our internal status
             const state = response.state;
+            console.log(`[PhonePe] Verification Response State: ${state}`);
 
             if (state === 'COMPLETED' || state === 'SUCCESS') { // Check exact enum values from logs/docs if ambiguous
                 // Docs usually use "COMPLETED" or "SUCCESS".
@@ -96,7 +101,7 @@ class PhonePeProvider extends PaymentGatewayInterface {
                 return { status: 'FAILED', raw: response };
             }
         } catch (error) {
-            console.error('PhonePe SDK Verify Error:', error);
+            console.error('[PhonePe] Verify Payment Error:', error.message);
             throw error;
         }
     }

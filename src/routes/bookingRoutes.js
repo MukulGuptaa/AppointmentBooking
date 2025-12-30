@@ -53,6 +53,7 @@ router.get('/slots', async (req, res) => {
 
         res.json(slotsWithStatus);
     } catch (error) {
+        console.error('[Booking] Error fetching slots:', error.message);
         res.status(500).json({ message: error.message });
     }
 });
@@ -61,8 +62,9 @@ router.get('/slots', async (req, res) => {
 // @route   POST /api/bookings
 // @access  Public
 router.post('/', async (req, res) => {
-    console.log('Request Body:', req.body);
-    const { date, time, userId, duration, amount = 100 } = req.body; // Default amount 100 INR if not sent
+    const { date, time, userId, duration, amount = 1 } = req.body; // Default amount 1 if not sent
+
+    console.log(`[Booking] Create Request - Date: ${date}, Time: ${time}, User: ${userId}`);
 
     if (!date || !time || !userId || !duration) {
         return res.status(400).json({ message: 'Date, time, userId, and duration are required' });
@@ -76,14 +78,22 @@ router.post('/', async (req, res) => {
             status: { $in: ['CONFIRMED', 'PENDING'] }
         });
 
-        console.log('Existing Booking:', existingBooking);
-
         if (existingBooking) {
+            console.warn(`[Booking] Slot already booked: ${date} ${time}`);
             return res.status(400).json({ message: 'Slot already booked or reserved' });
         }
 
         // Generate a unique Order ID
         const orderId = `ORDER_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+        // Initiate Payment First to get expireAt
+        console.log(`[Booking] Initiating Payment for OrderID: ${orderId}`);
+        const paymentResponse = await PaymentService.initiatePayment({
+            amount,
+            orderId,
+            userId,
+            mobileNumber: "9999999999" // In real app, fetch from User model
+        });
 
         const booking = await Booking.create({
             user: userId,
@@ -92,16 +102,11 @@ router.post('/', async (req, res) => {
             duration,
             amount,
             status: 'PENDING',
-            transactionId: orderId
+            transactionId: orderId,
+            expireAt: paymentResponse.expireAt
         });
 
-        // Initiate Payment
-        const paymentResponse = await PaymentService.initiatePayment({
-            amount,
-            orderId,
-            userId,
-            mobileNumber: "9999999999" // In real app, fetch from User model
-        });
+        console.log(`[Booking] Created PENDING booking: ${booking._id}`);
 
         res.status(201).json({
             booking,
@@ -109,8 +114,7 @@ router.post('/', async (req, res) => {
         });
 
     } catch (error) {
-        // Rollback booking if payment init fails
-        // await Booking.deleteOne({ _id: booking._id }); // Ideally
+        console.error('[Booking] Creation Error:', error.message);
         res.status(500).json({ message: error.message });
     }
 });
@@ -136,11 +140,12 @@ router.delete('/:id', async (req, res) => {
             return res.status(401).json({ message: 'Not authorized to cancel this booking' });
         }
 
-        // If CONFIRMED, maybe refund? For now just delete/cancel.
         await booking.deleteOne();
+        console.log(`[Booking] Booking cancelled/deleted: ${req.params.id}`);
 
         res.json({ message: 'Booking removed' });
     } catch (error) {
+        console.error('[Booking] Cancellation Error:', error.message);
         res.status(500).json({ message: error.message });
     }
 });
