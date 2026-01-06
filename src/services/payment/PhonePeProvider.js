@@ -39,7 +39,7 @@ class PhonePeProvider extends PaymentGatewayInterface {
             const requestBuilder = CreateSdkOrderRequest.StandardCheckoutBuilder()
                 .merchantOrderId(orderId)
                 .amount(amountInPaise)
-                .redirectUrl(`http://localhost:5002/api/payments/callback/${orderId}`) // "redirectUrl" in builder
+                .redirectUrl(`https://dr-madhumati-bookings-backend.vercel.app/api/payments/callback/${orderId}`) // "redirectUrl" in builder
                 .message("Booking Payment") // Optional message
                 .expireAfter(300); // 1 hour expiry
 
