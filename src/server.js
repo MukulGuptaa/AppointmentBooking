@@ -12,6 +12,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
+let isConnected = false;
+
+async function connectToDB(){
+    try{
+        await mongoose.connect(process.env.MONGO_URI);
+        isConnected = true;
+        console.log('Connected to mongoDb');
+    }catch(error){
+        console.log('Error connecting to mongoDb: ',error);
+    }
+}
+
+app.use((req, res, next) => {
+  if(!isConnected){
+    connectToDB();
+  }
+  next();
+});
+
 // Routes
 app.get('/api', (req, res) => {
     res.send('Hello World');
@@ -21,9 +41,9 @@ app.use('/api/bookings', require('./routes/bookingRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 
 // Database Connection
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('MongoDB Connected'))
-    .catch(err => console.error('MongoDB connection error:', err));
+// mongoose.connect(process.env.MONGO_URI)
+//     .then(() => console.log('MongoDB Connected'))
+//     .catch(err => console.error('MongoDB connection error:', err));
 
 const PORT = process.env.PORT || 5000;
 
