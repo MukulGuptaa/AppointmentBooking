@@ -50,3 +50,5 @@ app.use('/api/payments', require('./routes/paymentRoutes'));
 // app.listen(PORT, () => {
 //     console.log(`Server running on port ${PORT}`);
 // });
+
+module.exports = app;
