@@ -13,6 +13,9 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+app.get('/api', (req, res) => {
+    res.send('Hello World');
+});
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', require('./routes/bookingRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
